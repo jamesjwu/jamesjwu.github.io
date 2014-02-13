@@ -8,10 +8,12 @@ a {
 	font-family:'Bebas Neue';
 	color:white;
 	font-size: 40pt;
+	opacity: .9;
 }
 a:hover {
 	text-decoration: none;
 	color:white;
+	opacity: 1;
 }
 
 
