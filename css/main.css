@@ -4,15 +4,25 @@
    Author's custom styles
    ========================================================================== */
 
+@font-face {
+    font-family: 'MyFont';
+    src: url('http://jamesjwu.github.io/css/BebasNeue.otf'),
+
+}
+
+h1 {
+	font-family: 'MyFont';
+	font-size:150pt;
+}
+
 a {
-	font-family:'Bebas Neue';
-	color:white;
-	font-size: 40pt;
-	opacity: .9;
+	font-family: 'MyFont';
+	color:gray;
+	font-size: 34pt;
 }
 a:hover {
 	text-decoration: none;
-	color:white;
+	color:black;
 	opacity: 1;
 }
 
