@@ -241,13 +241,14 @@ function renderPlan(){
 function renderTotals(){
   const T=new Map();
   alloc.forEach(a=>statsOf(nodes[a]).forEach(s=>s.split("\n").join(" ").split(/(?<=\.)\s+/).forEach(line=>{
-    const nums=[]; const tpl=line.replace(/(\d+(?:\.\d+)?)/g,(m)=>{nums.push(+m); return "#";});
+    // only magnitudes add up: "N%" and "+N"; tier ranges, "1 tier" etc stay literal
+    const nums=[]; const tpl=line.replace(/(^|[^\d.-])(\+?)(\d+(?:\.\d+)?)(%)/g,(m,pre,plus,num,pc)=>{nums.push(+num); return pre+plus+"#"+pc;}).replace(/(^|\s)\+(\d+(?:\.\d+)?)(?![\d%])/g,(m,pre,num)=>{nums.push(+num); return pre+"+#";});
     const k=tpl; const cur=T.get(k); if(!cur) T.set(k,{nums:nums.slice(),c:1,raw:line}); else { cur.c++; cur.nums=cur.nums.map((x,j)=>x+(nums[j]||0)); } })));
   const box=document.getElementById("totals");
   if(!T.size){ box.innerHTML="<p>Allocate nodes to see your combined stats.</p>"; return; }
   const sumable=t=>/increased|reduced|more|less|chance|\+|additional|Pack Size|Quantity|Rarity/i.test(t);
   box.innerHTML='<ul class="stats" style="padding-left:16px">'+[...T.entries()].sort((a,b)=>b[1].c-a[1].c).map(([tpl,v])=>{
-    let txt=v.c>1&&v.nums.length&&sumable(tpl)?(()=>{let j=0; return tpl.replace(/#/g,()=>{const x=v.nums[j++]; return String(Math.round(x*100)/100);});})():v.raw;
+    let txt=v.c>1&&v.nums.length&&!/#% (more|less)\b/.test(tpl)?(()=>{let j=0; return tpl.replace(/#/g,()=>{const x=v.nums[j++]; return String(Math.round(x*100)/100);});})():v.raw;
     return `<li>${esc(txt)}${v.c>1?` <span style="color:var(--muted)">×${v.c}</span>`:""}</li>`; }).join("")+"</ul>";
 }
 function renderLegend(){
