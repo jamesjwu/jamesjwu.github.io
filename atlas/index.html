@@ -85,6 +85,10 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 .stats{margin:4px 0 8px;padding-left:18px;color:var(--ink)}.stats li{margin:2px 0}
 @keyframes qp{50%{stroke-opacity:.35}}.qhit{animation:qp 1.4s ease-in-out infinite}
+#pick{position:absolute;z-index:6;width:min(320px,calc(100% - 16px));background:rgba(17,24,39,.98);border:1px solid var(--brass);border-radius:6px;padding:10px;box-shadow:0 10px 28px rgba(0,0,0,.6)}
+#pick .ph{display:flex;flex-direction:column;margin-bottom:8px}#pick .ph b{font-family:var(--f-display);color:var(--frost);letter-spacing:.03em}
+#pick .opt{display:block;width:100%;text-align:left;font-family:var(--f-body);font-size:13px;letter-spacing:0;line-height:1.4;padding:8px 10px;margin:5px 0;color:var(--ink);border-color:var(--line);background:var(--panel-2)}
+#pick .opt:hover,#pick .opt:focus-visible{border-color:var(--brass);color:var(--ink);background:rgba(210,172,98,.1)}#pick .opt.cur{border-color:var(--frost)}
 .node{cursor:pointer}.wheel{cursor:pointer}
 </style>
 </head>
@@ -107,6 +111,7 @@ select{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
   <div class="canvas">
     <svg id="tree" aria-label="Atlas passive tree"><defs id="defs"></defs></svg>
     <div id="tip" hidden></div>
+    <div id="pick" hidden role="dialog" aria-label="Choose an effect"></div>
     <div class="hint" id="hint">Click a node to path to it (1 point per node). Click an allocated node to refund it and anything cut off. Click a wheel's centre to highlight that mechanic. Drag to pan, scroll or pinch to zoom.</div>
     <div class="search"><input id="q" type="search" placeholder="Search nodes (e.g. strongbox, scarab, map)" aria-label="Search nodes" autocomplete="off"><span id="qn"></span></div>
     <div class="zoom"><button id="zin" type="button" aria-label="Zoom in">+</button><button id="zout" type="button" aria-label="Zoom out">−</button><button id="zfit" type="button" aria-label="Fit tree">⤢</button></div>
@@ -320,10 +325,28 @@ svg.addEventListener("pointermove",ev=>{
   else if(t&&t.k==="w"){ if(lastHover!=="w"+t.m){ lastHover="w"+t.m; clearPreview(); tip.innerHTML=`<b style="color:${mcol(t.m)};font-family:var(--f-display)">${esc(DATA.mechs[t.m])}</b><br><span class="small">Click to highlight this mechanic</span>`;} placeTip(ev.clientX,ev.clientY); }
   else { lastHover=null; tip.hidden=true; clearPreview(); }
 });
+const pick=document.getElementById("pick");
+function closePick(){ pick.hidden=true; pick.innerHTML=""; }
+function openPick(i,cx,cy){
+  const n=nodes[i], on=alloc.has(i); const p=on?null:shortestPath(i); if(!on&&!p) return;
+  pick.innerHTML=`<div class="ph"><b>${esc(n.n)}</b><span class="small">${on?"Allocated · pick an effect":`Pick an effect · +${p.length} point${p.length===1?"":"s"}`}</span></div>`+
+    n.v.map((st,j)=>`<button type="button" class="opt${choice[n.id]===j?" cur":""}" data-j="${j}">${st.map(nl).join("<br>")}</button>`).join("")+
+    `<div class="row" style="justify-content:flex-end;margin-top:6px">${on?`<button type="button" data-act="refund">Refund</button>`:""}<button type="button" data-act="cancel">Cancel</button></div>`;
+  pick.hidden=false; const R=svg.getBoundingClientRect(); const w=pick.offsetWidth, h=pick.offsetHeight;
+  let x=cx-R.left+12, y=cy-R.top+12; if(x+w>R.width-8) x=Math.max(8,cx-R.left-w-12); if(y+h>R.height-8) y=Math.max(8,R.height-h-8);
+  pick.style.left=x+"px"; pick.style.top=y+"px"; pick.dataset.i=i; const f=pick.querySelector(".opt"); if(f) f.focus({preventScroll:true});
+}
+pick.addEventListener("click",ev=>{ const b=ev.target.closest("button"); if(!b) return; const i=+pick.dataset.i, n=nodes[i];
+  if(b.dataset.j!=null){ if(!alloc.has(i)) allocate(i); if(alloc.has(i)) choice[n.id]=+b.dataset.j; save(); }
+  else if(b.dataset.act==="refund"){ refund(i); }
+  closePick(); render(); showNode(i); });
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"&&!pick.hidden) closePick(); });
+svg.addEventListener("pointerdown",()=>{ if(!pick.hidden) closePick(); },true);
 function act(t,touch,cx,cy){
   if(!t) return;
   if(t.k==="w"){ selMech=selMech===t.m?null:t.m; render(); return; }
   const i=t.i; if(nodes[i].k===5){ showNode(i); return; }
+  if(nodes[i].v){ selNode=i; lastHover=null; clearPreview(); tip.hidden=true; showNode(i); openPick(i,cx,cy); return; }
   if(touch&&selNode!==i&&!alloc.has(i)){ selNode=i; previewNode(i,cx,cy); showNode(i); return; } // first tap previews on touch
   selNode=i; alloc.has(i)?refund(i):allocate(i); lastHover=null; clearPreview(); tip.hidden=true; render(); showNode(i);
 }
