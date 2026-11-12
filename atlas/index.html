@@ -235,7 +235,7 @@ function renderPlan(){
   const box=document.getElementById("plan"); const by={}; const big=[];
   alloc.forEach(a=>{ const n=nodes[a]; if(n.k===5) return; const key=n.m>=0?DATA.mechs[n.m]:"Paths"; by[key]=(by[key]||0)+1; if(n.k===1||n.k===2||n.k===4) big.push(n); });
   const rows=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div><span class="nm"><i style="width:9px;height:9px;border-radius:50%;background:${COL[k]||"#d2ac62"};display:inline-block"></i>${esc(k)}</span><span>${v} pt${v===1?"":"s"}</span></div>`).join("");
-  const nb=big.map(n=>`<div><span class="nm">${n.k===2?"◆":n.k===4?"◎":"•"} ${esc(n.n)}${n.v?(choice[n.id]==null?' <span class="small" style="color:var(--warn)">(pick an effect)</span>':` <span class="small">(option ${choice[n.id]+1})</span>`):""}</span></div>`).join("");
+  const nb=big.map(n=>`<div><span class="nm">${n.k===2?"◆":n.k===4?"◎":"•"} ${esc(n.n)}${n.v?(choice[n.id]==null?' <span class="small" style="color:var(--warn)">(pick an effect)</span>':` <span class="small">(${esc(n.v[choice[n.id]].join(" ").replace(/\n/g," ").slice(0,70))})</span>`):""}</span></div>`).join("");
   box.innerHTML=(rows||'<p class="small">Nothing allocated yet.</p>')+(nb?`<h3 style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px">Notables, keystones and gateways</h3>${nb}`:"");
 }
 function renderTotals(){
@@ -263,8 +263,11 @@ const KIND=["Small passive","Notable","Keystone","Wheel","Gateway","Atlas start"
 function nodeHtml(n,full){
   const mech=n.m>=0?`<span class="small" style="color:${mcol(n.m)}">${esc(DATA.mechs[n.m])}</span> · `:"";
   let h=`<p style="margin:0 0 4px"><b style="font-family:var(--f-display);color:${n.k===2?"#f0d080":n.k===1?"var(--frost)":"var(--ink)"}">${esc(n.n||"Atlas start")}</b><br>${mech}<span class="small">${KIND[n.k]}</span></p>`;
-  if(n.v){ if(n.vh) h+=`<p style="margin:4px 0">${n.vh.map(nl).join("<br>")}</p>`; h+=`<p class="small" style="margin:4px 0">Choose one effect${full?"":" (in the Selected panel)"}:</p>`;
-    h+=n.v.map((st,j)=>full&&alloc.has(n.i)?`<label style="display:flex;gap:6px;align-items:flex-start;margin:4px 0;cursor:pointer"><input type="radio" name="var${n.id}" value="${j}"${choice[n.id]===j?" checked":""}><span>${st.map(nl).join("<br>")}</span></label>`:`<ul class="stats"><li>${j+1}. ${st.map(nl).join("<br>")}</li></ul>`).join(""); }
+  if(n.v){ if(n.vh) h+=`<p style="margin:4px 0">${n.vh.map(nl).join("<br>")}</p>`; const c=alloc.has(n.i)?choice[n.id]:undefined;
+    if(c!=null){ h+=`<p class="small" style="margin:4px 0;color:var(--frost)">Chosen effect:</p><ul class="stats" style="color:var(--frost)">${n.v[c].map(s=>`<li>${nl(s)}</li>`).join("")}</ul>`;
+      h+=`<p class="small" style="margin:6px 0 2px">Other option${n.v.length>2?"s":""}${full?"":" (click to change)"}:</p><ul class="stats small" style="color:var(--muted)">${n.v.map((st,j)=>j===c?"":`<li>${st.map(nl).join("<br>")}</li>`).join("")}</ul>`; }
+    else { h+=`<p class="small" style="margin:4px 0">${alloc.has(n.i)?'<span style="color:var(--warn)">No effect picked yet.</span> Click the node to pick one:':"Choose one effect when you allocate it:"}</p>`;
+      h+=`<ul class="stats">${n.v.map((st,j)=>`<li>${st.map(nl).join("<br>")}</li>`).join("")}</ul>`; } }
   else if(n.s&&n.s.length) h+=`<ul class="stats">${n.s.map(s=>`<li>${nl(s)}</li>`).join("")}</ul>`;
   if(full&&n.r) h+=`<p class="small">${n.r.map(esc).join(" ")}</p>`;
   if(full&&n.f) h+=`<p class="small" style="font-style:italic">${esc(n.f)}</p>`;
@@ -273,10 +276,9 @@ function nodeHtml(n,full){
 function showNode(i){
   const n=nodes[i]; let h=nodeHtml(n,true);
   if(n.k===5) h+=`<p class="small">Every plan starts here.</p>`;
-  else if(alloc.has(i)) h+=`<p class="small">Allocated. Click it again to refund it and anything cut off.</p>`;
+  else if(alloc.has(i)) h+=`<p class="small">${n.v?"Allocated. Click it to change the effect or refund it.":"Allocated. Click it again to refund it and anything cut off."}</p>`;
   else { const p=shortestPath(i); if(p) h+=`<p>Pathing here costs <b style="color:var(--frost)">${p.length}</b> point${p.length===1?"":"s"}.</p>`; }
   const box=document.getElementById("info"); box.innerHTML=h;
-  box.querySelectorAll("input[type=radio]").forEach(r=>r.addEventListener("change",()=>{ choice[n.id]=+r.value; save(); render(); }));
 }
 const tip=document.getElementById("tip");
 function clearPreview(){gPreview.innerHTML="";}
@@ -286,7 +288,7 @@ function previewNode(i,cx,cy){
   if(n.k!==5&&!alloc.has(i)){ const p=shortestPath(i); if(p){ line=`+${p.length} point${p.length===1?"":"s"}`; const set=new Set(p);
       DATA.edges.forEach(e=>{ if(e[2]&&e[2][0]==="w") return; const a=set.has(e[0])||alloc.has(e[0]), b=set.has(e[1])||alloc.has(e[1]); if(a&&b&&(set.has(e[0])||set.has(e[1]))) el("path",{d:edgePath(e),fill:"none",stroke:"#ffe7a8","stroke-width":10,"stroke-dasharray":"30 22",opacity:.9},gPreview); });
       p.forEach(id=>el("circle",{cx:nodes[id].x,cy:nodes[id].y,r:RAD[nodes[id].k]||50,fill:"none",stroke:"#ffe7a8","stroke-width":7},gPreview)); } }
-  else if(alloc.has(i)&&n.k!==5) line="Allocated · click to refund";
+  else if(alloc.has(i)&&n.k!==5) line=n.v?"Allocated · click to change or refund":"Allocated · click to refund";
   tip.innerHTML=nodeHtml(n,false)+(line?`<p style="margin:4px 0 0">${line}</p>`:""); placeTip(cx,cy);
 }
 
